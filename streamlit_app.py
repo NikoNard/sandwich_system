@@ -209,6 +209,29 @@ def page_place_order():
             st.rerun()
     else:
         st.info("Please select all sandwich components")
+    
+    # Navigation buttons
+    st.divider()
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("← Back", use_container_width=True):
+            st.session_state.current_page = "customer_info"
+            st.rerun()
+    
+    with col2:
+        if st.session_state.session_orders:
+            if st.button("🛒 View Cart", type="secondary", use_container_width=True):
+                st.session_state.current_page = "manage_orders"
+                st.rerun()
+    
+    with col3:
+        if st.button("✓ Checkout", type="secondary", use_container_width=True):
+            if st.session_state.session_orders:
+                st.session_state.current_page = "checkout"
+                st.rerun()
+            else:
+                st.error("Add items to cart before checkout!")
 
 # ===== PAGE 3: MANAGE ORDERS =====
 def page_manage_orders():
