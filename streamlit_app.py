@@ -6,15 +6,25 @@ A user-friendly interface for ordering custom sandwiches with order history
 import streamlit as st
 import sys
 import os
+import importlib.util
 from datetime import datetime
 from pathlib import Path
 
 # Add OOP_copy to path so we can import our classes
 current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(current_dir, 'OOP_copy'))
+oop_path = os.path.join(current_dir, 'OOP_copy')
 
-from menu import Menu  # pylint: disable=import-error
-from sandwich_order import SandwichOrder  # pylint: disable=import-error
+# Dynamically import menu.py
+menu_spec = importlib.util.spec_from_file_location("menu", os.path.join(oop_path, "menu.py"))
+menu_module = importlib.util.module_from_spec(menu_spec)
+menu_spec.loader.exec_module(menu_module)
+Menu = menu_module.Menu
+
+# Dynamically import sandwich_order.py
+sandwich_spec = importlib.util.spec_from_file_location("sandwich_order", os.path.join(oop_path, "sandwich_order.py"))
+sandwich_module = importlib.util.module_from_spec(sandwich_spec)
+sandwich_spec.loader.exec_module(sandwich_module)
+SandwichOrder = sandwich_module.SandwichOrder
 
 # File paths
 MENU_PATH = os.path.join(current_dir, 'OOP_copy', 'menu.txt')
