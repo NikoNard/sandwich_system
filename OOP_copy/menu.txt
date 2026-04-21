@@ -1,0 +1,7 @@
+SIZES;6 inch,12 inch
+PRICES;5.00,8.00
+BREAD;White,Wheat,Italian,Multigrain,Sourdough
+PROTEIN;Turkey,Ham,Pepperoni,Chicken,Steak,None
+CHEESE;American,Swiss,Cheddar,Provolone,None
+TOPPINGS;Lettuce,Tomato,Onion,Pickles,None
+SAUCES;Mayo,Mustard,Ranch,None
