@@ -13,8 +13,8 @@ from pathlib import Path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(current_dir, 'OOP_copy'))
 
-from menu import Menu
-from sandwich_order import SandwichOrder
+from menu import Menu  # pylint: disable=import-error
+from sandwich_order import SandwichOrder  # pylint: disable=import-error
 
 # File paths
 MENU_PATH = os.path.join(current_dir, 'OOP_copy', 'menu.txt')
