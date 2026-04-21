@@ -206,14 +206,6 @@ def page_place_order():
             st.session_state.session_orders.append(order)
             st.session_state.order_confirmation = f"✓ Added {order.get_size()} sandwich to cart!"
             st.success("Order added to cart!")
-            
-            # Reset form
-            st.session_state.bread_select = None
-            st.session_state.protein_select = None
-            st.session_state.cheese_select = None
-            st.session_state.toppings_select = None
-            st.session_state.sauce_select = None
-            
             st.rerun()
     else:
         st.info("Please select all sandwich components")
