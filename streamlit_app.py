@@ -10,10 +10,15 @@ from datetime import datetime
 from pathlib import Path
 
 # Add OOP_copy to path so we can import our classes
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'OOP_copy'))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(current_dir, 'OOP_copy'))
 
 from menu import Menu
 from sandwich_order import SandwichOrder
+
+# File paths
+MENU_PATH = os.path.join(current_dir, 'OOP_copy', 'menu.txt')
+HISTORY_PATH = os.path.join(current_dir, 'OOP_copy', 'order_history.txt')
 
 # ===== PAGE CONFIG =====
 st.set_page_config(
@@ -33,7 +38,7 @@ if 'customer_phone' not in st.session_state:
 if 'session_orders' not in st.session_state:
     st.session_state.session_orders = []
 if 'menu' not in st.session_state:
-    st.session_state.menu = Menu("OOP_copy/menu.txt")
+    st.session_state.menu = Menu(MENU_PATH)
 if 'sizes_prices' not in st.session_state:
     # Extract size-to-price mapping
     sizes = st.session_state.menu.get_category("SIZES")
@@ -47,15 +52,14 @@ if 'order_confirmation' not in st.session_state:
 # ===== HELPER FUNCTIONS =====
 def load_order_history():
     """Load all past orders from file."""
-    history_file = "OOP_copy/order_history.txt"
-    if not os.path.exists(history_file):
+    if not os.path.exists(HISTORY_PATH):
         return []
     
     orders = []
     current_order = {}
     
     try:
-        with open(history_file, 'r') as f:
+        with open(HISTORY_PATH, 'r') as f:
             for line in f:
                 line = line.strip()
                 if line.startswith("="):
@@ -79,7 +83,7 @@ def calculate_session_total():
 def save_orders_to_file(customer_name, customer_phone):
     """Save all session orders to file."""
     for order in st.session_state.session_orders:
-        order.save_to_file("OOP_copy/order_history.txt", customer_name, customer_phone)
+        order.save_to_file(HISTORY_PATH, customer_name, customer_phone)
 
 # ===== PAGE 1: CUSTOMER INFORMATION =====
 def page_customer_info():
