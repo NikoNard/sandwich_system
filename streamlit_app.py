@@ -164,14 +164,17 @@ def page_place_order():
     
     # Toppings selection (multi-select - can select multiple)
     toppings = st.session_state.menu.get_category("TOPPINGS")
-    selected_toppings = st.multiselect("Select Toppings", toppings, key="toppings_select")
     
-    # Validate toppings: cannot select "None" with other options
-    if selected_toppings and "None" in selected_toppings and len(selected_toppings) > 1:
-        st.warning("⚠️ Cannot select 'None' with other toppings. Please choose either 'None' or specific toppings.")
-        selected_toppings = [t for t in selected_toppings if t != "None"]
-        # Force the state to update
-        st.session_state.toppings_select = selected_toppings
+    # Create a callback to validate toppings
+    def validate_toppings():
+        """Prevent selecting None with other toppings"""
+        current = st.session_state.toppings_select
+        if current and "None" in current and len(current) > 1:
+            # Remove None from selection
+            st.session_state.toppings_select = [t for t in current if t != "None"]
+            st.warning("⚠️ Cannot select 'None' with other toppings. 'None' was removed.")
+    
+    selected_toppings = st.multiselect("Select Toppings", toppings, key="toppings_select", on_change=validate_toppings)
     
     # Sauce selection (multi-select)
     sauces = st.session_state.menu.get_category("SAUCES")
