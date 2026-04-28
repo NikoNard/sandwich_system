@@ -40,6 +40,34 @@ st.set_page_config(
 
 st.title("🥪 Sandwich Order System")
 
+# ===== ACCESSIBILITY IMPROVEMENTS =====
+st.markdown("""
+<style>
+    /* Increase button size for accessibility */
+    button {
+        min-width: 50px !important;
+        min-height: 44px !important;
+        font-size: 16px !important;
+    }
+    
+    /* Improve contrast and clarity */
+    .stSelectbox, .stMultiSelect, .stTextInput {
+        font-size: 16px !important;
+    }
+    
+    /* Better focus indicators for keyboard navigation */
+    button:focus {
+        outline: 3px solid #FF4B4B !important;
+        outline-offset: 2px !important;
+    }
+    
+    /* Improve selected item visibility */
+    .stMultiSelect [data-baseweb="select"] {
+        border: 2px solid #1f77b4 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # ===== INITIALIZE SESSION STATE =====
 if 'customer_name' not in st.session_state:
     st.session_state.customer_name = ""
@@ -47,6 +75,10 @@ if 'customer_phone' not in st.session_state:
     st.session_state.customer_phone = ""
 if 'session_orders' not in st.session_state:
     st.session_state.session_orders = []
+if 'favorite_sandwiches' not in st.session_state:
+    st.session_state.favorite_sandwiches = {}
+if 'menu_mode' not in st.session_state:
+    st.session_state.menu_mode = "Basic"
 if 'menu' not in st.session_state:
     st.session_state.menu = Menu(MENU_PATH)
 if 'sizes_prices' not in st.session_state:
@@ -95,6 +127,26 @@ def save_orders_to_file(customer_name, customer_phone):
     for order in st.session_state.session_orders:
         order.save_to_file(HISTORY_PATH, customer_name, customer_phone)
 
+def save_favorite(sandwich_name, sandwich_dict):
+    """Save a sandwich to favorites."""
+    st.session_state.favorite_sandwiches[sandwich_name] = sandwich_dict
+
+def load_favorite(sandwich_name):
+    """Load a favorite sandwich."""
+    return st.session_state.favorite_sandwiches.get(sandwich_name, None)
+
+def get_basic_menu_items(category):
+    """Get simplified basic menu items."""
+    basic_menus = {
+        "SIZES": ["6 inch", "12 inch"],
+        "BREAD": ["White", "Wheat"],
+        "PROTEIN": ["Turkey", "Ham", "Chicken"],
+        "CHEESE": ["American", "Cheddar"],
+        "TOPPINGS": ["Lettuce", "Tomato", "Onion"],
+        "SAUCES": ["Mayo", "Mustard"],
+    }
+    return basic_menus.get(category, st.session_state.menu.get_category(category))
+
 # ===== PAGE 1: CUSTOMER INFORMATION =====
 def page_customer_info():
     st.header("📋 Customer Information")
@@ -134,55 +186,112 @@ def page_customer_info():
 def page_place_order():
     st.header("🥖 Build Your Sandwich")
     
-    col1, col2 = st.columns([3, 1])
+    col1, col2, col3 = st.columns([2, 1, 1])
     
     with col1:
         st.write(f"**Customer:** {st.session_state.customer_name}")
     with col2:
-        if st.button("← Back"):
+        # Menu mode toggle (Improvement #3: Simplify menu)
+        st.session_state.menu_mode = st.selectbox(
+            "Menu Mode",
+            ["Basic", "Full"],
+            index=0 if st.session_state.menu_mode == "Basic" else 1,
+            key="menu_mode_select",
+            help="Basic: Essential options | Full: All options"
+        )
+    with col3:
+        if st.button("← Back", help="Return to customer information"):
             st.session_state.current_page = "customer_info"
             st.rerun()
     
-    # Create new sandwich order
     st.subheader("Customize Your Sandwich")
     
+    # Get menu items based on mode (Improvement #3)
+    menu_items = {
+        "SIZES": st.session_state.menu.get_category("SIZES"),
+        "BREAD": get_basic_menu_items("BREAD") if st.session_state.menu_mode == "Basic" else st.session_state.menu.get_category("BREAD"),
+        "PROTEIN": get_basic_menu_items("PROTEIN") if st.session_state.menu_mode == "Basic" else st.session_state.menu.get_category("PROTEIN"),
+        "CHEESE": get_basic_menu_items("CHEESE") if st.session_state.menu_mode == "Basic" else st.session_state.menu.get_category("CHEESE"),
+        "TOPPINGS": get_basic_menu_items("TOPPINGS") if st.session_state.menu_mode == "Basic" else st.session_state.menu.get_category("TOPPINGS"),
+        "SAUCES": get_basic_menu_items("SAUCES") if st.session_state.menu_mode == "Basic" else st.session_state.menu.get_category("SAUCES"),
+    }
+    
     # Size selection
-    sizes = st.session_state.menu.get_category("SIZES")
-    selected_size = st.selectbox("Select Size", sizes, key="size_select")
+    selected_size = st.selectbox(
+        "Select Size",
+        menu_items["SIZES"],
+        key="size_select",
+        help="Choose sandwich size"
+    )
     
-    # Bread selection (multi-select)
-    breads = st.session_state.menu.get_category("BREAD")
-    selected_breads = st.multiselect("Select Bread", breads, max_selections=1, key="bread_select")
+    # Bread selection
+    selected_breads = st.multiselect(
+        "Select Bread [Select 1]",
+        menu_items["BREAD"],
+        max_selections=1,
+        key="bread_select",
+        help="Choose one bread type"
+    )
     
-    # Protein selection (multi-select)
-    proteins = st.session_state.menu.get_category("PROTEIN")
-    selected_proteins = st.multiselect("Select Protein", proteins, max_selections=1, key="protein_select")
+    # Protein selection
+    selected_proteins = st.multiselect(
+        "Select Protein [Select 1]",
+        menu_items["PROTEIN"],
+        max_selections=1,
+        key="protein_select",
+        help="Choose one protein type"
+    )
     
-    # Cheese selection (multi-select)
-    cheeses = st.session_state.menu.get_category("CHEESE")
-    selected_cheeses = st.multiselect("Select Cheese", cheeses, max_selections=1, key="cheese_select")
+    # Cheese selection
+    selected_cheeses = st.multiselect(
+        "Select Cheese [Select 1]",
+        menu_items["CHEESE"],
+        max_selections=1,
+        key="cheese_select",
+        help="Choose one cheese type"
+    )
     
-    # Toppings selection (multi-select - can select multiple)
-    toppings = st.session_state.menu.get_category("TOPPINGS")
+    # Toppings selection with validation
+    toppings_label = "Select Toppings [Select Multiple]" if st.session_state.menu_mode == "Full" else "Select Toppings"
     
-    # Create a callback to validate toppings
     def validate_toppings():
         """Prevent selecting None with other toppings"""
         current = st.session_state.toppings_select
         if current and "None" in current and len(current) > 1:
-            # Remove None from selection
             st.session_state.toppings_select = [t for t in current if t != "None"]
-            st.warning("⚠️ Cannot select 'None' with other toppings. 'None' was removed.")
+            st.warning("⚠️ Cannot select 'None (skip toppings)' with other toppings.")
     
-    selected_toppings = st.multiselect("Select Toppings", toppings, key="toppings_select", on_change=validate_toppings)
+    selected_toppings = st.multiselect(
+        toppings_label,
+        menu_items["TOPPINGS"],
+        key="toppings_select",
+        on_change=validate_toppings,
+        help="Select multiple toppings or 'None' to skip"
+    )
     
-    # Sauce selection (multi-select)
-    sauces = st.session_state.menu.get_category("SAUCES")
-    selected_sauces = st.multiselect("Select Sauce", sauces, max_selections=1, key="sauce_select")
+    # Sauce selection
+    selected_sauces = st.multiselect(
+        "Select Sauce [Select 1]",
+        menu_items["SAUCES"],
+        max_selections=1,
+        key="sauce_select",
+        help="Choose one sauce type"
+    )
     
-    # Order preview
+    # Special Instructions (Improvement #5)
     st.divider()
-    st.subheader("📦 Order Preview")
+    st.subheader("✏️ Special Instructions (Optional)")
+    special_instructions = st.text_area(
+        "Any special requests?",
+        placeholder="E.g., Toast bread lightly, extra mayo, no onion...",
+        max_chars=100,
+        height=80,
+        help="Add up to 100 characters of special instructions"
+    )
+    
+    # Order preview and quantity (Improvements #1 & #5)
+    st.divider()
+    st.subheader("📦 Order Preview & Quantity")
     
     if (selected_size and selected_breads and selected_proteins and 
         selected_cheeses and selected_toppings and selected_sauces):
@@ -197,25 +306,68 @@ def page_place_order():
         order.set_sauce(selected_sauces[0])
         order.calculate_total(st.session_state.sizes_prices)
         
-        # Display preview
-        col1, col2 = st.columns([2, 1])
+        # Display preview with quantity (Improvement #1: Quantity Field)
+        col1, col2, col3 = st.columns([2, 1, 1])
         
         with col1:
             st.write(f"**Size:** {order.get_size()}")
             st.write(f"**Bread:** {order.get_bread()}")
             st.write(f"**Protein:** {order.get_protein()}")
             st.write(f"**Cheese:** {order.get_cheese()}")
-            st.write(f"**Toppings:** {order.get_topping()}")
+            st.write(f"**Toppings:** {order.get_topping() if order.get_topping() else '(None)'}")
             st.write(f"**Sauce:** {order.get_sauce()}")
+            if special_instructions:
+                st.write(f"**Special Instructions:** {special_instructions}")
         
         with col2:
-            st.metric("Price", f"${order.get_price():.2f}")
+            st.metric("Unit Price", f"${order.get_price():.2f}")
+        
+        with col3:
+            # Quantity spinner (Improvement #1)
+            quantity = st.number_input(
+                "Quantity",
+                min_value=1,
+                max_value=10,
+                value=1,
+                step=1,
+                key="quantity_input",
+                help="Select quantity (1-10)"
+            )
+            subtotal = order.get_price() * quantity
+            st.metric("Subtotal", f"${subtotal:.2f}")
+        
+        # Save as favorite button (Improvement #4)
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            favorite_name = st.text_input(
+                "Save as Favorite (optional)",
+                placeholder="E.g., My Regular",
+                key="favorite_name",
+                help="Name this sandwich for quick reorder"
+            )
+        
+        with col2:
+            if st.button("❤️ Save Favorite", help="Save this sandwich to favorites"):
+                if favorite_name:
+                    save_favorite(favorite_name, {
+                        "size": selected_size,
+                        "bread": selected_breads[0],
+                        "protein": selected_proteins[0],
+                        "cheese": selected_cheeses[0],
+                        "toppings": selected_toppings,
+                        "sauce": selected_sauces[0],
+                        "special_instructions": special_instructions
+                    })
+                    st.success(f"✓ Saved '{favorite_name}' to favorites!")
+                else:
+                    st.error("Please enter a name for this favorite")
         
         # Add to cart button
-        if st.button("➕ Add to Cart", type="primary", use_container_width=True):
-            st.session_state.session_orders.append(order)
-            st.session_state.order_confirmation = f"✓ Added {order.get_size()} sandwich to cart!"
-            st.success("Order added to cart!")
+        st.divider()
+        if st.button("➕ Add to Cart", type="primary", use_container_width=True, help="Add sandwich(es) to your cart"):
+            for _ in range(quantity):
+                st.session_state.session_orders.append(order)
+            st.success(f"✓ Added {quantity} sandwich(es) to cart!")
             st.rerun()
     else:
         st.info("Please select all sandwich components")
@@ -225,23 +377,45 @@ def page_place_order():
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        if st.button("← Back", use_container_width=True):
+        if st.button("← Back", use_container_width=True, help="Return to customer info"):
             st.session_state.current_page = "customer_info"
             st.rerun()
     
     with col2:
         if st.session_state.session_orders:
-            if st.button("🛒 View Cart", type="secondary", use_container_width=True):
+            if st.button("🛒 View Cart", type="secondary", use_container_width=True, help="Review your order"):
                 st.session_state.current_page = "manage_orders"
                 st.rerun()
     
     with col3:
-        if st.button("✓ Checkout", type="secondary", use_container_width=True):
+        if st.button("✓ Checkout", type="secondary", use_container_width=True, help="Proceed to payment"):
             if st.session_state.session_orders:
                 st.session_state.current_page = "checkout"
                 st.rerun()
             else:
                 st.error("Add items to cart before checkout!")
+    
+    # Favorites section (Improvement #4)
+    if st.session_state.favorite_sandwiches:
+        st.divider()
+        st.subheader("⭐ Your Favorite Sandwiches")
+        
+        favorite_cols = st.columns(min(3, len(st.session_state.favorite_sandwiches)))
+        for idx, (name, sandwich) in enumerate(st.session_state.favorite_sandwiches.items()):
+            with favorite_cols[idx % len(favorite_cols)]:
+                st.write(f"**{name}**")
+                st.write(f"Size: {sandwich['size']}")
+                st.write(f"Bread: {sandwich['bread']}")
+                
+                if st.button(f"🔄 Reorder {name}", key=f"reorder_{name}", use_container_width=True, help="Reorder this favorite"):
+                    # Load favorite and populate form
+                    st.session_state.size_select = sandwich['size']
+                    st.session_state.bread_select = [sandwich['bread']]
+                    st.session_state.protein_select = [sandwich['protein']]
+                    st.session_state.cheese_select = [sandwich['cheese']]
+                    st.session_state.toppings_select = sandwich['toppings']
+                    st.session_state.sauce_select = [sandwich['sauce']]
+                    st.rerun()
 
 # ===== PAGE 3: MANAGE ORDERS =====
 def page_manage_orders():
