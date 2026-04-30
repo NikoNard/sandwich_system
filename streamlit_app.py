@@ -242,6 +242,25 @@ def page_customer_info():
 def page_place_order():
     st.header("🥖 Build Your Sandwich")
     
+    # Initialize widget keys if reordering a favorite
+    if st.session_state.reorder_sandwich:
+        reorder_data = st.session_state.reorder_sandwich
+        # Pre-populate the session state keys so widgets will show these values
+        if 'size_select' not in st.session_state or st.session_state.get('_force_reorder_init'):
+            st.session_state.size_select = reorder_data.get('size', '')
+        if 'bread_select' not in st.session_state or st.session_state.get('_force_reorder_init'):
+            st.session_state.bread_select = [reorder_data.get('bread')] if reorder_data.get('bread') else []
+        if 'protein_select' not in st.session_state or st.session_state.get('_force_reorder_init'):
+            st.session_state.protein_select = [reorder_data.get('protein')] if reorder_data.get('protein') else []
+        if 'cheese_select' not in st.session_state or st.session_state.get('_force_reorder_init'):
+            st.session_state.cheese_select = [reorder_data.get('cheese')] if reorder_data.get('cheese') else []
+        if 'toppings_select' not in st.session_state or st.session_state.get('_force_reorder_init'):
+            st.session_state.toppings_select = reorder_data.get('toppings', [])
+        if 'sauce_select' not in st.session_state or st.session_state.get('_force_reorder_init'):
+            st.session_state.sauce_select = [reorder_data.get('sauce')] if reorder_data.get('sauce') else []
+        # Clear the flag
+        st.session_state._force_reorder_init = False
+    
     col1, col2, col3 = st.columns([2, 1, 1])
     
     with col1:
@@ -273,9 +292,13 @@ def page_place_order():
         with col2:
             if st.button("🔄 Clear", key="clear_reorder", help="Start building a new sandwich"):
                 st.session_state.reorder_sandwich = None
+                st.session_state.size_select = ''
+                st.session_state.bread_select = []
+                st.session_state.protein_select = []
+                st.session_state.cheese_select = []
+                st.session_state.toppings_select = []
+                st.session_state.sauce_select = []
                 st.rerun()
-    
-    st.divider()
     
     # Get menu items based on mode (Improvement #3)
     menu_items = {
@@ -289,7 +312,7 @@ def page_place_order():
     
     # Size selection
     try:
-        size_index = menu_items["SIZES"].index(reorder_data['size']) if reorder_data and reorder_data.get('size') in menu_items["SIZES"] else 0
+        size_index = menu_items["SIZES"].index(st.session_state.get('size_select', '')) if st.session_state.get('size_select') in menu_items["SIZES"] else 0
     except (ValueError, KeyError, TypeError):
         size_index = 0
     
@@ -302,42 +325,27 @@ def page_place_order():
     )
     
     # Bread selection
-    bread_default = []
-    if reorder_data and reorder_data.get('bread') in menu_items["BREAD"]:
-        bread_default = [reorder_data['bread']]
-    
     selected_breads = st.multiselect(
         "Select Bread [Select 1]",
         menu_items["BREAD"],
-        default=bread_default,
         max_selections=1,
         key="bread_select",
         help="Choose one bread type"
     )
     
     # Protein selection
-    protein_default = []
-    if reorder_data and reorder_data.get('protein') in menu_items["PROTEIN"]:
-        protein_default = [reorder_data['protein']]
-    
     selected_proteins = st.multiselect(
         "Select Protein [Select 1]",
         menu_items["PROTEIN"],
-        default=protein_default,
         max_selections=1,
         key="protein_select",
         help="Choose one protein type"
     )
     
     # Cheese selection
-    cheese_default = []
-    if reorder_data and reorder_data.get('cheese') in menu_items["CHEESE"]:
-        cheese_default = [reorder_data['cheese']]
-    
     selected_cheeses = st.multiselect(
         "Select Cheese [Select 1]",
         menu_items["CHEESE"],
-        default=cheese_default,
         max_selections=1,
         key="cheese_select",
         help="Choose one cheese type"
@@ -345,11 +353,6 @@ def page_place_order():
     
     # Toppings selection with validation
     toppings_label = "Select Toppings [Select Multiple]" if st.session_state.menu_mode == "Full" else "Select Toppings"
-    
-    toppings_default = []
-    if reorder_data and reorder_data.get('toppings'):
-        # Filter to only include toppings that exist in current menu
-        toppings_default = [t for t in reorder_data.get('toppings', []) if t in menu_items["TOPPINGS"]]
     
     def validate_toppings():
         """Prevent selecting None with other toppings"""
@@ -361,21 +364,15 @@ def page_place_order():
     selected_toppings = st.multiselect(
         toppings_label,
         menu_items["TOPPINGS"],
-        default=toppings_default,
         key="toppings_select",
         on_change=validate_toppings,
         help="Select multiple toppings or 'None' to skip"
     )
     
     # Sauce selection
-    sauce_default = []
-    if reorder_data and reorder_data.get('sauce') in menu_items["SAUCES"]:
-        sauce_default = [reorder_data['sauce']]
-    
     selected_sauces = st.multiselect(
         "Select Sauce [Select 1]",
         menu_items["SAUCES"],
-        default=sauce_default,
         max_selections=1,
         key="sauce_select",
         help="Choose one sauce type"
