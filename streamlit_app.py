@@ -74,14 +74,25 @@ if 'customer_name' not in st.session_state:
 if 'customer_phone' not in st.session_state:
     st.session_state.customer_phone = ""
 if 'session_orders' not in st.session_state:
+    # Each item is a dict: {"order": SandwichOrder, "meta": {"special_instructions": str}}
     st.session_state.session_orders = []
-if 'order_metadata' not in st.session_state:
-    # Stores quantity and special instructions for each order by index
-    st.session_state.order_metadata = {}
 if 'favorite_sandwiches' not in st.session_state:
     st.session_state.favorite_sandwiches = {}
 if 'general_notes' not in st.session_state:
     st.session_state.general_notes = ""
+if 'FAVS_PATH' not in st.session_state:
+    st.session_state.FAVS_PATH = os.path.join(current_dir, 'OOP_copy', 'favorites.json')
+    # Load persisted favorites if available
+    try:
+        import json
+        if os.path.exists(st.session_state.FAVS_PATH):
+            with open(st.session_state.FAVS_PATH, 'r') as f:
+                st.session_state.favorite_sandwiches = json.load(f)
+    except Exception:
+        st.session_state.favorite_sandwiches = {}
+if 'reorder_sandwich' not in st.session_state:
+    # Stores sandwich data when user clicks reorder; separate from widget keys
+    st.session_state.reorder_sandwich = None
 if 'menu_mode' not in st.session_state:
     st.session_state.menu_mode = "Basic"
 if 'menu' not in st.session_state:
@@ -125,16 +136,56 @@ def load_order_history():
 
 def calculate_session_total():
     """Calculate total price of all orders in session."""
-    return sum(order.get_price() for order in st.session_state.session_orders)
+    total = 0.0
+    for item in st.session_state.session_orders:
+        if isinstance(item, dict):
+            total += item['order'].get_price()
+        else:
+            # Fallback for old SandwichOrder objects (backward compat)
+            total += item.get_price()
+    return total
 
 def save_orders_to_file(customer_name, customer_phone):
-    """Save all session orders to file."""
-    for order in st.session_state.session_orders:
-        order.save_to_file(HISTORY_PATH, customer_name, customer_phone)
+    """Save all session orders to file with metadata and notes."""
+    import json
+    try:
+        with open(HISTORY_PATH, 'a') as f:
+            f.write('=' * 50 + '\n')
+            f.write(f'Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n')
+            f.write(f'Customer: {customer_name}\n')
+            f.write(f'Phone: {customer_phone}\n')
+            # Write items with special instructions
+            for idx, item in enumerate(st.session_state.session_orders, 1):
+                if isinstance(item, dict):
+                    order = item['order']
+                    meta = item.get('meta', {})
+                else:
+                    # Backward compat for old SandwichOrder objects
+                    order = item
+                    meta = {}
+                f.write(f'Item {idx}: {order.display_summary()}\n')
+                if meta.get('special_instructions'):
+                    f.write(f'  Special Instructions: {meta.get("special_instructions")}\n')
+            # General order notes
+            if st.session_state.get('general_notes', '').strip():
+                f.write(f'General Notes: {st.session_state.get("general_notes")}\n')
+            f.write(f'Total: ${calculate_session_total():.2f}\n')
+            f.write('=' * 50 + '\n\n')
+        return True
+    except Exception as e:
+        st.error(f'Error saving order: {e}')
+        return False
 
 def save_favorite(sandwich_name, sandwich_dict):
-    """Save a sandwich to favorites."""
+    """Save a sandwich to favorites and persist to disk."""
     st.session_state.favorite_sandwiches[sandwich_name] = sandwich_dict
+    # Persist favorites to disk
+    try:
+        import json
+        with open(st.session_state.FAVS_PATH, 'w') as f:
+            json.dump(st.session_state.favorite_sandwiches, f, indent=2)
+    except Exception as e:
+        st.warning(f'Could not save favorites: {e}')
 
 def load_favorite(sandwich_name):
     """Load a favorite sandwich."""
@@ -207,6 +258,7 @@ def page_place_order():
     with col3:
         if st.button("← Back", help="Return to customer information"):
             st.session_state.current_page = "customer_info"
+            st.session_state.reorder_sandwich = None  # Clear reorder state
             st.rerun()
     
     st.subheader("Customize Your Sandwich")
@@ -221,10 +273,14 @@ def page_place_order():
         "SAUCES": get_basic_menu_items("SAUCES") if st.session_state.menu_mode == "Basic" else st.session_state.menu.get_category("SAUCES"),
     }
     
+    # Load reorder data if user clicked reorder on a favorite
+    reorder_data = st.session_state.reorder_sandwich
+    
     # Size selection
     selected_size = st.selectbox(
         "Select Size",
         menu_items["SIZES"],
+        index=menu_items["SIZES"].index(reorder_data['size']) if reorder_data and reorder_data.get('size') in menu_items["SIZES"] else 0,
         key="size_select",
         help="Choose sandwich size"
     )
@@ -233,6 +289,7 @@ def page_place_order():
     selected_breads = st.multiselect(
         "Select Bread [Select 1]",
         menu_items["BREAD"],
+        default=[reorder_data['bread']] if reorder_data and reorder_data.get('bread') in menu_items["BREAD"] else [],
         max_selections=1,
         key="bread_select",
         help="Choose one bread type"
@@ -242,6 +299,7 @@ def page_place_order():
     selected_proteins = st.multiselect(
         "Select Protein [Select 1]",
         menu_items["PROTEIN"],
+        default=[reorder_data['protein']] if reorder_data and reorder_data.get('protein') in menu_items["PROTEIN"] else [],
         max_selections=1,
         key="protein_select",
         help="Choose one protein type"
@@ -251,6 +309,7 @@ def page_place_order():
     selected_cheeses = st.multiselect(
         "Select Cheese [Select 1]",
         menu_items["CHEESE"],
+        default=[reorder_data['cheese']] if reorder_data and reorder_data.get('cheese') in menu_items["CHEESE"] else [],
         max_selections=1,
         key="cheese_select",
         help="Choose one cheese type"
@@ -269,6 +328,7 @@ def page_place_order():
     selected_toppings = st.multiselect(
         toppings_label,
         menu_items["TOPPINGS"],
+        default=[t for t in reorder_data.get('toppings', []) if t in menu_items["TOPPINGS"]] if reorder_data else [],
         key="toppings_select",
         on_change=validate_toppings,
         help="Select multiple toppings or 'None' to skip"
@@ -278,6 +338,7 @@ def page_place_order():
     selected_sauces = st.multiselect(
         "Select Sauce [Select 1]",
         menu_items["SAUCES"],
+        default=[reorder_data['sauce']] if reorder_data and reorder_data.get('sauce') in menu_items["SAUCES"] else [],
         max_selections=1,
         key="sauce_select",
         help="Choose one sauce type"
@@ -288,6 +349,7 @@ def page_place_order():
     st.subheader("✏️ Special Instructions (Optional)")
     special_instructions = st.text_area(
         "Any special requests?",
+        value=reorder_data.get('special_instructions', '') if reorder_data else '',
         placeholder="E.g., Toast bread lightly, extra mayo, no onion...",
         max_chars=100,
         height=80,
@@ -370,16 +432,16 @@ def page_place_order():
         # Add to cart button
         st.divider()
         if st.button("➕ Add to Cart", type="primary", use_container_width=True, help="Add sandwich(es) to your cart"):
-            order_index = len(st.session_state.session_orders)
             for _ in range(quantity):
-                st.session_state.session_orders.append(order)
-                # Store metadata for this order (special instructions)
-                st.session_state.order_metadata[order_index] = {
-                    "special_instructions": special_instructions
+                cart_item = {
+                    "order": order,
+                    "meta": {
+                        "special_instructions": special_instructions
+                    }
                 }
-                order_index += 1
+                st.session_state.session_orders.append(cart_item)
+            st.session_state.reorder_sandwich = None  # Clear reorder state
             st.success(f"✓ Added {quantity} sandwich(es) to cart!")
-            st.rerun()
             st.rerun()
     else:
         st.info("Please select all sandwich components")
@@ -422,20 +484,20 @@ def page_place_order():
                 col1, col2 = st.columns(2)
                 with col1:
                     if st.button(f"🔄 Reorder", key=f"reorder_{name}", use_container_width=True, help="Reorder this favorite"):
-                        # Load favorite and populate form
-                        st.session_state.size_select = sandwich['size']
-                        st.session_state.bread_select = [sandwich['bread']]
-                        st.session_state.protein_select = [sandwich['protein']]
-                        st.session_state.cheese_select = [sandwich['cheese']]
-                        st.session_state.toppings_select = sandwich['toppings']
-                        st.session_state.sauce_select = [sandwich['sauce']]
-                        if 'special_instructions' in sandwich:
-                            st.session_state.special_instructions = sandwich['special_instructions']
+                        # Store sandwich data in reorder_sandwich (don't set widget keys directly)
+                        st.session_state.reorder_sandwich = sandwich
                         st.rerun()
                 
                 with col2:
                     if st.button(f"🗑️", key=f"delete_fav_{name}", use_container_width=True, help="Delete this favorite"):
                         del st.session_state.favorite_sandwiches[name]
+                        # Persist deletion to disk
+                        try:
+                            import json
+                            with open(st.session_state.FAVS_PATH, 'w') as f:
+                                json.dump(st.session_state.favorite_sandwiches, f, indent=2)
+                        except Exception:
+                            pass
                         st.success(f"✓ Deleted '{name}' from favorites")
                         st.rerun()
 
@@ -465,16 +527,20 @@ def page_manage_orders():
     
     # Group identical orders
     order_groups = {}
-    for idx, order in enumerate(st.session_state.session_orders):
+    for idx, item in enumerate(st.session_state.session_orders):
+        # Extract order object from dict or use directly if old format
+        order = item['order'] if isinstance(item, dict) else item
+        meta = item.get('meta', {}) if isinstance(item, dict) else {}
         summary = order.display_summary()
         if summary not in order_groups:
-            order_groups[summary] = {'indices': [], 'order': order}
+            order_groups[summary] = {'indices': [], 'order': order, 'meta': meta}
         order_groups[summary]['indices'].append(idx)
     
     # Display grouped orders
     for group_num, (summary, group_data) in enumerate(order_groups.items(), 1):
         order = group_data['order']
         indices = group_data['indices']
+        meta = group_data['meta']
         quantity = len(indices)
         
         with st.container(border=True):
@@ -483,10 +549,8 @@ def page_manage_orders():
             with col1:
                 st.write(f"**Order #{group_num}:** {summary}")
                 # Show special instructions if available
-                if indices[0] in st.session_state.order_metadata:
-                    instructions = st.session_state.order_metadata[indices[0]].get('special_instructions', '')
-                    if instructions:
-                        st.caption(f"📝 Notes: {instructions}")
+                if meta.get('special_instructions'):
+                    st.caption(f"📝 Notes: {meta.get('special_instructions')}")
             
             with col2:
                 st.metric("Qty", quantity)
@@ -499,8 +563,6 @@ def page_manage_orders():
                     # Delete all instances of this order
                     for idx in sorted(indices, reverse=True):
                         st.session_state.session_orders.pop(idx)
-                        if idx in st.session_state.order_metadata:
-                            del st.session_state.order_metadata[idx]
                     st.rerun()
     
 
@@ -533,10 +595,13 @@ def page_checkout():
     
     # Group orders for display
     order_groups = {}
-    for idx, order in enumerate(st.session_state.session_orders):
+    for idx, item in enumerate(st.session_state.session_orders):
+        # Extract order object from dict or use directly if old format
+        order = item['order'] if isinstance(item, dict) else item
+        meta = item.get('meta', {}) if isinstance(item, dict) else {}
         summary = order.display_summary()
         if summary not in order_groups:
-            order_groups[summary] = {'indices': [], 'order': order}
+            order_groups[summary] = {'indices': [], 'order': order, 'meta': meta}
         order_groups[summary]['indices'].append(idx)
     
     # Display grouped orders
@@ -544,6 +609,7 @@ def page_checkout():
     for group_num, (summary, group_data) in enumerate(order_groups.items(), 1):
         order = group_data['order']
         indices = group_data['indices']
+        meta = group_data['meta']
         quantity = len(indices)
         subtotal = order.get_price() * quantity
         total += subtotal
@@ -561,10 +627,8 @@ def page_checkout():
                 st.write(f"Sauce: {order.get_sauce()}")
                 
                 # Show special instructions if available
-                if indices[0] in st.session_state.order_metadata:
-                    instructions = st.session_state.order_metadata[indices[0]].get('special_instructions', '')
-                    if instructions:
-                        st.caption(f"📝 Special Instructions: {instructions}")
+                if meta.get('special_instructions'):
+                    st.caption(f"📝 Special Instructions: {meta.get('special_instructions')}")
             
             with col2:
                 st.metric("Subtotal", f"${subtotal:.2f}")
@@ -591,10 +655,10 @@ def page_checkout():
         
         # Reset session
         st.session_state.session_orders = []
-        st.session_state.order_metadata = {}
         st.session_state.general_notes = ""
         st.session_state.customer_name = ""
         st.session_state.customer_phone = ""
+        st.session_state.reorder_sandwich = None
         st.session_state.current_page = "customer_info"
         
         st.info("Thank you for your order! Starting new session...")
