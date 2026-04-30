@@ -243,23 +243,16 @@ def page_place_order():
     st.header("🥖 Build Your Sandwich")
     
     # Initialize widget keys if reordering a favorite
+    # This MUST happen before any widgets are rendered
     if st.session_state.reorder_sandwich:
         reorder_data = st.session_state.reorder_sandwich
-        # Pre-populate the session state keys so widgets will show these values
-        if 'size_select' not in st.session_state or st.session_state.get('_force_reorder_init'):
-            st.session_state.size_select = reorder_data.get('size', '')
-        if 'bread_select' not in st.session_state or st.session_state.get('_force_reorder_init'):
-            st.session_state.bread_select = [reorder_data.get('bread')] if reorder_data.get('bread') else []
-        if 'protein_select' not in st.session_state or st.session_state.get('_force_reorder_init'):
-            st.session_state.protein_select = [reorder_data.get('protein')] if reorder_data.get('protein') else []
-        if 'cheese_select' not in st.session_state or st.session_state.get('_force_reorder_init'):
-            st.session_state.cheese_select = [reorder_data.get('cheese')] if reorder_data.get('cheese') else []
-        if 'toppings_select' not in st.session_state or st.session_state.get('_force_reorder_init'):
-            st.session_state.toppings_select = reorder_data.get('toppings', [])
-        if 'sauce_select' not in st.session_state or st.session_state.get('_force_reorder_init'):
-            st.session_state.sauce_select = [reorder_data.get('sauce')] if reorder_data.get('sauce') else []
-        # Clear the flag
-        st.session_state._force_reorder_init = False
+        # Force-set these values in session state (they take precedence over widget defaults)
+        st.session_state.size_select = reorder_data.get('size', '')
+        st.session_state.bread_select = [reorder_data.get('bread')] if reorder_data.get('bread') else []
+        st.session_state.protein_select = [reorder_data.get('protein')] if reorder_data.get('protein') else []
+        st.session_state.cheese_select = [reorder_data.get('cheese')] if reorder_data.get('cheese') else []
+        st.session_state.toppings_select = reorder_data.get('toppings', []) if isinstance(reorder_data.get('toppings', []), list) else []
+        st.session_state.sauce_select = [reorder_data.get('sauce')] if reorder_data.get('sauce') else []
     
     col1, col2, col3 = st.columns([2, 1, 1])
     
@@ -299,6 +292,15 @@ def page_place_order():
                 st.session_state.toppings_select = []
                 st.session_state.sauce_select = []
                 st.rerun()
+        
+        # Debug: Show what's being loaded
+        with st.expander("🔍 Debug: Loaded values"):
+            st.write(f"Size: {reorder_data.get('size')}")
+            st.write(f"Bread: {reorder_data.get('bread')}")
+            st.write(f"Protein: {reorder_data.get('protein')}")
+            st.write(f"Cheese: {reorder_data.get('cheese')}")
+            st.write(f"Toppings: {reorder_data.get('toppings')}")
+            st.write(f"Sauce: {reorder_data.get('sauce')}")
     
     # Get menu items based on mode (Improvement #3)
     menu_items = {
